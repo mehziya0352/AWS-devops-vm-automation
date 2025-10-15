@@ -44,7 +44,8 @@ jobs:
           echo "ec2_ip=$EC2_IP" >> $GITHUB_OUTPUT
 
       - name: Debug EC2 IP
-        run: echo "EC2 IP: ${{ env.EC2_PUBLIC_IP }}"
+        run: |
+          echo "EC2 IP: ${{ env.EC2_PUBLIC_IP }}"
 
       - name: Upload Terraform output
         uses: actions/upload-artifact@v4
@@ -86,14 +87,14 @@ jobs:
           # Add EC2 to known_hosts
           until ssh-keyscan -H $EC2_PUBLIC_IP >> ~/.ssh/known_hosts 2>/dev/null; do
             echo "Waiting for SSH to be available..."
-            sleep 5
+            sleep 15
           done
 
       - name: Wait for EC2 SSH to be ready
         run: |
           until ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa ubuntu@$EC2_PUBLIC_IP "echo ready"; do
             echo "Waiting for EC2 SSH..."
-            sleep 5
+            sleep 15
           done
 
       - name: Generate Ansible inventory
