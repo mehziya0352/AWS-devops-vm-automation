@@ -1,0 +1,61 @@
+name: AWS DevOps VM Full Setup
+
+on:
+  workflow_dispatch:
+
+env:
+  AWS_REGION: us-east-1
+  TF_DIR: terraform
+
+jobs:
+  terraform:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.6.0
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v3
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Terraform Init & Apply
+        working-directory: ${{ env.TF_DIR }}
+        run: terraform init && terraform apply -auto-approve -var "key_name=${{ secrets.AWS_KEY_NAME }}"
+
+      - name: Save EC2 Public IP
+        id: ec2
+        working-directory: ${{ env.TF_DIR }}
+        run: echo "EC2_PUBLIC_IP=$(terraform output -raw ec2_public_ip)" >> $GITHUB_ENV
+
+  ansible:
+    runs-on: ubuntu-latest
+    needs: terraform
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python & Install Ansible
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.x"
+        run: pip install ansible
+
+      - name: Setup SSH Key
+        run: |
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+
+      - name: Create Ansible Inventory
+        run: |
+          mkdir -p ansible
+          echo "[devops_vm]" > ansible/hosts
+          echo "devops ansible_host=${{ env.EC2_PUBLIC_IP }} ansible_user=ubuntu ansible_ssh_private_key_file=~/.ssh/id_rsa" >> ansible/hosts
+
+      - name: Run Setup Playbook
+        run: ansible-playbook -i ansible/hosts ansible/setup_vm.yml
