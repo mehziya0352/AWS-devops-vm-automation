@@ -29,10 +29,20 @@ jobs:
         working-directory: ${{ env.TF_DIR }}
         run: terraform init && terraform apply -auto-approve -var "key_name=${{ secrets.AWS_KEY_NAME }}"
 
+      - name: Save Terraform output
+        working-directory: ./terraform/
+        run: terraform output -json > tfoutput.json
+
       - name: Save EC2 Public IP
         id: ec2
         working-directory: ${{ env.TF_DIR }}
         run: echo "EC2_PUBLIC_IP=$(terraform output -raw ec2_public_ip)" >> $GITHUB_ENV
+
+      - name: Upload Terraform output
+        uses: actions/upload-artifact@v4
+        with:
+          name: tfoutput
+          path: terraform/tfoutput.json
 
       - name: Debug EC2 IP
         run: |
@@ -51,8 +61,11 @@ jobs:
         with:
           python-version: "3.x"
 
-      - name: Install Ansible
-        run: pip install ansible
+      - name: Install prerequisites
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3-pip jq
+          pip3 install ansible
 
       - name: Setup SSH Key
         run: |
@@ -60,12 +73,18 @@ jobs:
           echo "${{ secrets.ANSIBLE_PRIVATE_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
 
+      - name: Wait for EC2 SSH to be ready
+        run: sleep 30
 
-      - name: Create Ansible Inventory
+      - name: Generate Ansible inventory
         run: |
-          mkdir -p ansible
-          echo "[devops_vm]" > ansible/inventory.ini
-          echo "devops ansible_host=${{ env.EC2_PUBLIC_IP }} ansible_user=ubuntu ansible_ssh_private_key_file=~/.ssh/id_rsa" >> ansible/inventory.ini
+          python3 scripts/tf-to-inventory.py terraform/tfoutput.json > ansible/inventory.ini
+          cat ansible/inventory.ini
+          
+      - name: Run Ansible playbook
+        working-directory: ./ansible/
+        run: ansible-playbook -i inventory.ini setup_vm.yml --private-key ~/.ssh/id_rsa -vv
 
-      - name: Run Setup Playbook
-        run: ansible-playbook -i ansible/inventory.ini ansible/setup_vm.yml
+
+
+      
