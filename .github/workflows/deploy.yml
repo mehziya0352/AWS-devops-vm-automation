@@ -40,15 +40,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup Python & Install Ansible
+      - name: Setup Python
         uses: actions/setup-python@v4
         with:
           python-version: "3.x"
+
+      - name: Install Ansible
         run: pip install ansible
 
       - name: Setup SSH Key
         run: |
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          echo "${{ secrets.ANSIBLE_PRIVATE_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
 
       - name: Create Ansible Inventory
