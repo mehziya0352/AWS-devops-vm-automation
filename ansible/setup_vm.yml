@@ -1,6 +1,6 @@
 ---
 - name: Configure SSH and users on DevOps VM
-  hosts: devops_vm
+  hosts: all
   become: true
   vars:
     ssh_ports: [22, 222, 2222, 2223, 2224, 2225]
