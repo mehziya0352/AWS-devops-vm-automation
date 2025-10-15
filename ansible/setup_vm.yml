@@ -1,0 +1,41 @@
+---
+- name: Configure SSH and users on DevOps VM
+  hosts: devops_vm
+  become: true
+  vars:
+    ssh_ports: [22, 222, 2222, 2223, 2224, 2225]
+    users_to_create:
+      - alice
+      - bob
+      - charlie
+      - john
+      - kevin
+
+  tasks:
+    - name: Ensure users exist
+      user:
+        name: "{{ item }}"
+        state: present
+        shell: /bin/bash
+        create_home: yes
+      loop: "{{ users_to_create }}"
+
+    - name: Backup sshd_config
+      copy:
+        src: /etc/ssh/sshd_config
+        dest: /etc/ssh/sshd_config.bak
+        remote_src: yes
+
+    - name: Configure multiple SSH ports
+      lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: "^Port {{ item }}$"
+        line: "Port {{ item }}"
+        insertafter: EOF
+      loop: "{{ ssh_ports }}"
+
+    - name: Restart SSH service
+      systemd:
+        name: ssh
+        state: restarted
+        enabled: true
