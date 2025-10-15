@@ -87,6 +87,12 @@ jobs:
         run: |
           python3 scripts/tf-to-inventory.py terraform/tfoutput.json > ansible/inventory.ini
           cat ansible/inventory.ini
+
+      - name: Add EC2 host to known_hosts
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -H ${{ env.EC2_PUBLIC_IP }} >> ~/.ssh/known_hosts
+
           
       - name: Run Ansible playbook
         working-directory: ./ansible/
